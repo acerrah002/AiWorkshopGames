@@ -6,14 +6,14 @@
 <title>Hand Flappy Bird</title>
 
 <style>
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
 
 body {
     margin: 0;
     background: #000;
-    color: white;
+    color: #fff;
     font-family: Arial, sans-serif;
     overflow: hidden;
 }
@@ -22,6 +22,7 @@ body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 310px;
     height: 100vh;
+    height: 100dvh;
 }
 
 #gameWrap {
@@ -34,7 +35,8 @@ body {
     display: block;
     width: 100%;
     height: 100%;
-    background: black;
+    background: #000;
+    touch-action: manipulation;
 }
 
 #hud {
@@ -43,6 +45,15 @@ body {
     left: 22px;
     font-size: 28px;
     font-weight: bold;
+    pointer-events: none;
+}
+
+#best {
+    display: block;
+    font-size: 14px;
+    font-weight: normal;
+    color: #888;
+    margin-top: 2px;
 }
 
 #message {
@@ -53,6 +64,7 @@ body {
     text-align: center;
     font-weight: bold;
     pointer-events: none;
+    width: 70%;
 }
 
 #start {
@@ -60,7 +72,7 @@ body {
     inset: 0;
     display: grid;
     place-items: center;
-    background: #0009;
+    background: #000a;
 }
 
 #start button {
@@ -80,73 +92,52 @@ body {
     gap: 12px;
 }
 
-h2 {
-    font-size: 20px;
-    font-weight: 500;
-    margin: 0;
-}
+h2 { font-size: 20px; font-weight: 500; margin: 0; }
 
+/* Tracking panel: pure black, skeleton only */
 #camBox {
     position: relative;
     border: 1px solid #333;
-    aspect-ratio: 4 / 5;
-    background: black;
+    aspect-ratio: 4 / 3;
+    background: #000;
     overflow: hidden;
 }
 
-#video, #skeleton {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-}
-
+/* The camera feed stays alive for the tracker but is never visible */
 #video {
-    opacity: 0.12;
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 #skeleton {
-    opacity: 1;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
 }
 
-#status {
-    font-size: 14px;
-    color: #aaa;
-    line-height: 1.5;
-}
+#status { font-size: 14px; color: #aaa; line-height: 1.5; }
 
 #toggle {
     padding: 10px;
     background: #171717;
-    color: white;
+    color: #fff;
     border: 1px solid #444;
     border-radius: 6px;
     cursor: pointer;
 }
 
-#hint {
-    color: #888;
-    font-size: 12px;
-    line-height: 1.5;
-}
+#hint { color: #888; font-size: 12px; line-height: 1.5; }
 
-@media(max-width: 700px) {
-    #app {
-        grid-template-columns: minmax(0, 1fr) 190px;
-    }
-
-    #side {
-        padding: 10px 8px;
-    }
-
-    h2 {
-        font-size: 16px;
-    }
-
-    #hud {
-        font-size: 20px;
-    }
+@media (max-width: 700px) {
+    #app { grid-template-columns: minmax(0, 1fr) 190px; }
+    #side { padding: 10px 8px; }
+    h2 { font-size: 16px; }
+    #hud { font-size: 20px; }
 }
 </style>
 </head>
@@ -156,29 +147,22 @@ h2 {
 <div id="app">
 
     <div id="gameWrap">
-
         <canvas id="game"></canvas>
 
-        <div id="hud">Score: 0</div>
+        <div id="hud">Score: 0<span id="best">Best: 0</span></div>
 
-        <div id="message">
-            Pinch your index finger and thumb to flap
-        </div>
+        <div id="message">Pinch your index finger and thumb to flap</div>
 
         <div id="start">
-            <button id="play">
-                START GAME & ENABLE CAMERA
-            </button>
+            <button id="play">START GAME &amp; ENABLE CAMERA</button>
         </div>
-
     </div>
 
     <aside id="side">
-
         <h2>Hand Tracking</h2>
 
         <div id="camBox">
-            <video id="video" playsinline></video>
+            <video id="video" playsinline muted></video>
             <canvas id="skeleton"></canvas>
         </div>
 
@@ -190,652 +174,471 @@ h2 {
         <button id="toggle">Enable camera</button>
 
         <div id="hint">
-            Show one hand to the camera.
-            Bring your index fingertip and thumb tip together to flap.
+            Show one hand to the camera. Bring your index fingertip and
+            thumb tip together to flap. You can also click, tap or press Space.
         </div>
-
     </aside>
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-
-// ===============================
-// GAME VARIABLES
-// ===============================
-
-const canvas = document.querySelector('#game');
-const ctx = canvas.getContext('2d');
-
-const wrap = document.querySelector('#gameWrap');
-
-const video = document.querySelector('#video');
-
-const sk = document.querySelector('#skeleton');
-const sx = sk.getContext('2d');
-
+// =====================================================
+// ELEMENTS
+// =====================================================
+const canvas   = document.querySelector('#game');
+const ctx      = canvas.getContext('2d');
+const wrap     = document.querySelector('#gameWrap');
+const video    = document.querySelector('#video');
+const sk       = document.querySelector('#skeleton');
+const sx       = sk.getContext('2d');
 const statusEl = document.querySelector('#status');
-const msg = document.querySelector('#message');
-const start = document.querySelector('#start');
+const msg      = document.querySelector('#message');
+const startEl  = document.querySelector('#start');
+const hud      = document.querySelector('#hud');
+const toggleBtn = document.querySelector('#toggle');
 
-let W = 900;
-let H = 650;
+// =====================================================
+// CONSTANTS (tuned per 1/60s physics step)
+// =====================================================
+const STEP        = 1000 / 60;
+const GRAVITY     = 0.28;
+const FLAP_VY     = -6.2;
+const PIPE_SPEED  = 2.7;
+const PIPE_W      = 62;
+const CAP_W       = 76;
+const CAP_H       = 18;
+const PIPE_EVERY  = 88;      // steps between pipes
+const GROUND_H    = 25;
+const RESTART_LOCKOUT = 700; // ms after dying before a flap can restart
 
-let bird = {
-    x: 150,
-    y: 280,
-    vy: 0,
-    r: 15
-};
+// =====================================================
+// STATE
+// =====================================================
+let W = 900, H = 650;
 
-let pipes = [];
+// 'ready' = bird hovers until first flap, 'playing', 'dead'
+let state = 'ready';
+let bird, pipes, score, spawnTimer, deadAt = 0, hoverT = 0;
+let best = 0;
+try { best = +localStorage.getItem('handFlappyBest') || 0; } catch (e) {}
 
-let score = 0;
-let playing = false;
-let dead = false;
-
-let lastPipe = 0;
-
-let cam = null;
-
-let closed = false;
-let wasClosed = false;
-
-
-// ===============================
+// =====================================================
 // RESIZE
-// ===============================
-
+// =====================================================
 function resize() {
+    const d = window.devicePixelRatio || 1;
 
     const r = wrap.getBoundingClientRect();
-    const d = devicePixelRatio || 1;
-
     W = r.width;
     H = r.height;
-
-    canvas.width = W * d;
-    canvas.height = H * d;
-
+    canvas.width  = Math.round(W * d);
+    canvas.height = Math.round(H * d);
     ctx.setTransform(d, 0, 0, d, 0, 0);
 
-    sk.width = sk.clientWidth * d;
-    sk.height = sk.clientHeight * d;
-
+    sk.width  = Math.round(sk.clientWidth  * d);
+    sk.height = Math.round(sk.clientHeight * d);
     sx.setTransform(d, 0, 0, d, 0, 0);
 }
-
+new ResizeObserver(resize).observe(wrap);
 window.addEventListener('resize', resize);
-
 resize();
 
-
-// ===============================
-// GAME RESET
-// ===============================
-
-function reset() {
-
-    bird = {
-        x: W * 0.22,
-        y: H * 0.45,
-        vy: 0,
-        r: 15
-    };
-
-    pipes = [];
-
-    score = 0;
-    dead = false;
-    playing = true;
-
-    lastPipe = 0;
-
-    document.querySelector('#hud').textContent = 'Score: 0';
-
-    msg.textContent = 'Pinch thumb + index finger to flap';
-
-    start.style.display = 'none';
+// =====================================================
+// GAME CONTROL
+// =====================================================
+function setHud() {
+    hud.firstChild.textContent = 'Score: ' + score;
+    document.querySelector('#best').textContent = 'Best: ' + best;
 }
 
+function reset() {
+    bird = { x: W * 0.22, y: H * 0.45, vy: 0, r: 15 };
+    pipes = [];
+    score = 0;
+    spawnTimer = PIPE_EVERY; // first pipe appears right after the first flap
+    state = 'ready';
+    msg.textContent = 'Pinch thumb + index finger to flap';
+    startEl.style.display = 'none';
+    setHud();
+}
 
-// ===============================
-// FLAP
-// ===============================
+function die() {
+    if (state !== 'playing') return;
+    state = 'dead';
+    deadAt = performance.now();
+    if (score > best) {
+        best = score;
+        try { localStorage.setItem('handFlappyBest', best); } catch (e) {}
+    }
+    setHud();
+    msg.textContent = 'Game over — pinch or tap to restart';
+}
 
-function flap() {
+// One entry point for every input (pinch, click, tap, Space)
+function press() {
+    if (state === 'ready') {
+        state = 'playing';
+        msg.textContent = 'Pinch thumb + index finger to flap';
+        bird.vy = FLAP_VY;
+    } else if (state === 'playing') {
+        bird.vy = FLAP_VY;
+    } else if (state === 'dead') {
+        // Short lockout so a pinch you were already holding doesn't skip Game Over
+        if (performance.now() - deadAt > RESTART_LOCKOUT) reset();
+    }
+}
 
-    if (!playing) {
+canvas.addEventListener('pointerdown', press);
+window.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); press(); }
+});
 
-        if (dead) {
-            reset();
-        } else {
-            reset();
+// =====================================================
+// PIPES
+// =====================================================
+function addPipe() {
+    const floor = H - GROUND_H;
+    const gap = Math.min(220, Math.max(150, H * 0.27));
+    const margin = 60;
+    const range = Math.max(10, floor - gap - margin * 2);
+    const top = margin + Math.random() * range;
+
+    pipes.push({ x: W + 40, top, gap, passed: false });
+}
+
+// circle vs rectangle
+function hitsRect(cx, cy, r, rx, ry, rw, rh) {
+    const nx = Math.max(rx, Math.min(cx, rx + rw));
+    const ny = Math.max(ry, Math.min(cy, ry + rh));
+    const dx = cx - nx, dy = cy - ny;
+    return dx * dx + dy * dy < r * r;
+}
+
+// =====================================================
+// UPDATE (fixed 60Hz step, independent of monitor refresh rate)
+// =====================================================
+function update() {
+    if (state === 'ready') {
+        hoverT += 0.08;
+        bird.y = H * 0.45 + Math.sin(hoverT) * 8;
+        bird.vy = 0;
+        return;
+    }
+    if (state !== 'playing') return;
+
+    bird.vy += GRAVITY;
+    bird.y  += bird.vy;
+
+    if (++spawnTimer >= PIPE_EVERY) {
+        addPipe();
+        spawnTimer = 0;
+    }
+
+    const hitR = bird.r - 2; // slightly forgiving hitbox
+
+    for (const p of pipes) {
+        p.x -= PIPE_SPEED;
+
+        if (!p.passed && p.x + PIPE_W < bird.x) {
+            p.passed = true;
+            score++;
+            setHud();
+        }
+
+        const bottom = p.top + p.gap;
+
+        if (
+            hitsRect(bird.x, bird.y, hitR, p.x, 0, PIPE_W, p.top - CAP_H) ||
+            hitsRect(bird.x, bird.y, hitR, p.x - (CAP_W - PIPE_W) / 2, p.top - CAP_H, CAP_W, CAP_H) ||
+            hitsRect(bird.x, bird.y, hitR, p.x - (CAP_W - PIPE_W) / 2, bottom, CAP_W, CAP_H) ||
+            hitsRect(bird.x, bird.y, hitR, p.x, bottom + CAP_H, PIPE_W, H)
+        ) {
+            die();
+            return;
         }
     }
 
-    bird.vy = -6.2;
+    pipes = pipes.filter(p => p.x > -90);
+
+    if (bird.y + bird.r > H - GROUND_H) {
+        bird.y = H - GROUND_H - bird.r;
+        die();
+    } else if (bird.y - bird.r < 0) {
+        bird.y = bird.r;
+        bird.vy = 0; // bump off the ceiling instead of dying instantly
+    }
 }
 
-
-// ===============================
-// CREATE PIPE
-// ===============================
-
-function addPipe() {
-
-    let gap = Math.max(145, H * 0.25);
-
-    let top = 70 + Math.random() * (H - gap - 180);
-
-    pipes.push({
-        x: W + 40,
-        top: top,
-        gap: gap,
-        passed: false
-    });
-}
-
-
-// ===============================
-// MAIN GAME LOOP
-// ===============================
-
-function game() {
-
-    requestAnimationFrame(game);
-
-    ctx.clearRect(0, 0, W, H);
-
+// =====================================================
+// DRAW
+// =====================================================
+function draw() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
 
-    if (playing) {
+    // pipes
+    const capOff = (CAP_W - PIPE_W) / 2;
+    for (const p of pipes) {
+        const bottom = p.top + p.gap;
 
-        bird.vy += 0.28;
-        bird.y += bird.vy;
+        ctx.fillStyle = '#36c91e';
+        ctx.fillRect(p.x, 0, PIPE_W, p.top - CAP_H);
+        ctx.fillRect(p.x - capOff, p.top - CAP_H, CAP_W, CAP_H);
+        ctx.fillRect(p.x - capOff, bottom, CAP_W, CAP_H);
+        ctx.fillRect(p.x, bottom + CAP_H, PIPE_W, H - bottom - CAP_H);
 
-        if (Date.now() - lastPipe > 1450) {
-
-            addPipe();
-
-            lastPipe = Date.now();
-        }
-
-        pipes.forEach(p => {
-
-            p.x -= 2.7;
-
-            if (!p.passed && p.x + 62 < bird.x) {
-
-                p.passed = true;
-
-                score++;
-
-                document.querySelector('#hud').textContent =
-                    'Score: ' + score;
-            }
-
-            let bottom = p.top + p.gap;
-
-            // PIPE COLOR
-
-            ctx.fillStyle = '#36c91e';
-
-            // TOP PIPE
-
-            ctx.fillRect(p.x, 0, 62, p.top);
-
-            ctx.fillRect(
-                p.x - 7,
-                p.top - 18,
-                76,
-                18
-            );
-
-            // BOTTOM PIPE
-
-            ctx.fillRect(
-                p.x,
-                bottom,
-                62,
-                H - bottom
-            );
-
-            ctx.fillRect(
-                p.x - 7,
-                bottom,
-                76,
-                18
-            );
-
-            // PIPE HIGHLIGHTS
-
-            ctx.fillStyle = '#8cff45';
-
-            ctx.fillRect(
-                p.x + 9,
-                0,
-                9,
-                p.top - 18
-            );
-
-            ctx.fillRect(
-                p.x + 9,
-                bottom + 18,
-                9,
-                H - bottom - 18
-            );
-
-            // COLLISION
-
-            if (
-                bird.x + bird.r > p.x &&
-                bird.x - bird.r < p.x + 62 &&
-                (
-                    bird.y - bird.r < p.top ||
-                    bird.y + bird.r > bottom
-                )
-            ) {
-                endGame();
-            }
-
-        });
-
-        pipes = pipes.filter(p => p.x > -90);
-
-        if (
-            bird.y + bird.r > H - 28 ||
-            bird.y - bird.r < 0
-        ) {
-            endGame();
-        }
+        ctx.fillStyle = '#8cff45';
+        ctx.fillRect(p.x + 9, 0, 9, p.top - CAP_H);
+        ctx.fillRect(p.x + 9, bottom + CAP_H, 9, H - bottom - CAP_H);
     }
 
-
-    // ===============================
-    // GROUND
-    // ===============================
-
+    // ground
     ctx.fillStyle = '#278b19';
-    ctx.fillRect(0, H - 25, W, 8);
-
+    ctx.fillRect(0, H - GROUND_H, W, 8);
     ctx.fillStyle = '#8b642e';
-    ctx.fillRect(0, H - 17, W, 17);
+    ctx.fillRect(0, H - GROUND_H + 8, W, GROUND_H - 8);
 
-
-    // ===============================
-    // DRAW BIRD
-    // ===============================
-
+    // bird
     ctx.save();
-
     ctx.translate(bird.x, bird.y);
-
-    ctx.rotate(
-        Math.min(0.7, Math.max(-0.5, bird.vy * 0.06))
-    );
-
-    // BODY
+    ctx.rotate(Math.min(0.7, Math.max(-0.5, bird.vy * 0.06)));
 
     ctx.fillStyle = '#f7cf26';
-
-    ctx.beginPath();
-
-    ctx.arc(
-        0,
-        0,
-        bird.r,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fill();
-
-    // EYE
+    ctx.beginPath(); ctx.arc(0, 0, bird.r, 0, Math.PI * 2); ctx.fill();
 
     ctx.fillStyle = '#fff';
-
-    ctx.beginPath();
-
-    ctx.arc(6, -6, 6, 0, Math.PI * 2);
-
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -6, 6, 0, Math.PI * 2); ctx.fill();
 
     ctx.fillStyle = '#111';
-
-    ctx.beginPath();
-
-    ctx.arc(8, -6, 2.5, 0, Math.PI * 2);
-
-    ctx.fill();
-
-    // BEAK
+    ctx.beginPath(); ctx.arc(8, -6, 2.5, 0, Math.PI * 2); ctx.fill();
 
     ctx.fillStyle = '#f06b26';
-
     ctx.beginPath();
-
-    ctx.moveTo(12, 1);
-
-    ctx.lineTo(27, 5);
-
-    ctx.lineTo(12, 9);
-
+    ctx.moveTo(12, 1); ctx.lineTo(27, 5); ctx.lineTo(12, 9);
     ctx.fill();
 
     ctx.restore();
 
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
 
-    // ===============================
-    // GAME OVER
-    // ===============================
-
-    if (dead) {
-
-        ctx.fillStyle = '#fff';
-
-        ctx.textAlign = 'center';
-
+    if (state === 'dead') {
         ctx.font = 'bold 32px Arial';
-
-        ctx.fillText(
-            'GAME OVER',
-            W / 2,
-            H * 0.43
-        );
-
+        ctx.fillText('GAME OVER', W / 2, H * 0.43);
         ctx.font = '18px Arial';
-
-        ctx.fillText(
-            'Pinch or tap to restart',
-            W / 2,
-            H * 0.43 + 35
-        );
+        ctx.fillText('Score ' + score + '  ·  Best ' + best, W / 2, H * 0.43 + 32);
+        ctx.fillText('Pinch or tap to restart', W / 2, H * 0.43 + 60);
+    } else if (state === 'ready') {
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText('Pinch to flap — get ready', W / 2, H * 0.30);
     }
 }
 
+// =====================================================
+// MAIN LOOP — fixed timestep so speed is the same on 60/120/144Hz screens
+// =====================================================
+let last = performance.now();
+let acc = 0;
 
-// ===============================
-// GAME OVER FUNCTION
-// ===============================
-
-function endGame() {
-
-    if (!playing) return;
-
-    playing = false;
-    dead = true;
-
-    msg.textContent = 'Game over — pinch or tap to restart';
+function frame(t) {
+    requestAnimationFrame(frame);
+    acc += Math.min(100, t - last);
+    last = t;
+    while (acc >= STEP) { update(); acc -= STEP; }
+    draw();
 }
 
+reset();
+startEl.style.display = 'grid'; // show the start overlay on load
+requestAnimationFrame(frame);
 
-// ===============================
-// MOUSE / TOUCH SUPPORT
-// ===============================
+// =====================================================
+// SKELETON (black background, no camera image)
+// =====================================================
+const EDGES = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17]
+];
 
-canvas.addEventListener('pointerdown', () => {
+function clearSkeleton() {
+    sx.fillStyle = '#000';
+    sx.fillRect(0, 0, sk.clientWidth, sk.clientHeight);
+}
 
-    if (dead) {
-        reset();
-    } else if (playing) {
-        flap();
-    } else {
-        reset();
-    }
+function drawSkeleton(lm, pinched) {
+    const w = sk.clientWidth, h = sk.clientHeight;
+    clearSkeleton();
+    if (!lm) return;
 
-});
-
-
-// ===============================
-// HAND SKELETON
-// ===============================
-
-function drawSkeleton(landmarks) {
-
-    let w = sk.clientWidth;
-    let h = sk.clientHeight;
-
-    sx.clearRect(0, 0, w, h);
-
-    if (!landmarks) return;
-
-    const edges = [
-
-        [0,1],
-
-        [1,2],
-        [2,3],
-        [3,4],
-
-        [0,5],
-        [5,6],
-        [6,7],
-        [7,8],
-
-        [5,9],
-        [9,10],
-        [10,11],
-        [11,12],
-
-        [9,13],
-        [13,14],
-        [14,15],
-        [15,16],
-
-        [13,17],
-        [17,18],
-        [18,19],
-        [19,20],
-
-        [0,17]
-
-    ];
-
-    // DRAW BONES
+    // mirror horizontally so it moves like a mirror
+    const X = p => (1 - p.x) * w;
+    const Y = p => p.y * h;
 
     sx.lineWidth = 3;
-    sx.strokeStyle = '#aaa';
+    sx.lineCap = 'round';
+    sx.strokeStyle = '#bbb';
+    sx.beginPath();
+    for (const [a, b] of EDGES) {
+        sx.moveTo(X(lm[a]), Y(lm[a]));
+        sx.lineTo(X(lm[b]), Y(lm[b]));
+    }
+    sx.stroke();
 
-    edges.forEach(([a,b]) => {
+    // line between thumb and index tips
+    sx.strokeStyle = pinched ? '#55ff62' : '#555';
+    sx.lineWidth = 2;
+    sx.beginPath();
+    sx.moveTo(X(lm[4]), Y(lm[4]));
+    sx.lineTo(X(lm[8]), Y(lm[8]));
+    sx.stroke();
 
+    for (let i = 0; i < lm.length; i++) {
+        const tip = i === 4 || i === 8;
         sx.beginPath();
-
-        sx.moveTo(
-            landmarks[a].x * w,
-            landmarks[a].y * h
-        );
-
-        sx.lineTo(
-            landmarks[b].x * w,
-            landmarks[b].y * h
-        );
-
-        sx.stroke();
-
-    });
-
-
-    // DRAW JOINTS
-
-    landmarks.forEach((p, i) => {
-
-        sx.beginPath();
-
-        sx.arc(
-            p.x * w,
-            p.y * h,
-            i === 4 || i === 8 ? 6 : 3.5,
-            0,
-            Math.PI * 2
-        );
-
-        sx.fillStyle =
-            (i === 4 || i === 8)
-            ? (closed ? '#55ff62' : '#eee')
-            : '#777';
-
+        sx.arc(X(lm[i]), Y(lm[i]), tip ? 6 : 3.5, 0, Math.PI * 2);
+        sx.fillStyle = tip ? (pinched ? '#55ff62' : '#eee') : '#777';
         sx.fill();
-
-        sx.strokeStyle = '#ddd';
-
-        sx.stroke();
-
-    });
-
+    }
 }
 
+clearSkeleton();
 
-// ===============================
-// MEDIAPIPE HAND TRACKING
-// ===============================
+// =====================================================
+// STATUS (only touches the DOM when text actually changes)
+// =====================================================
+let lastStatus = '';
+function setStatus(camera, gesture, color) {
+    const html =
+        'Camera: <strong>' + camera + '</strong><br>' +
+        'Gesture: <strong' + (color ? ' style="color:' + color + '"' : '') + '>' + gesture + '</strong>';
+    if (html !== lastStatus) {
+        statusEl.innerHTML = html;
+        lastStatus = html;
+    }
+}
+
+// =====================================================
+// HAND TRACKING
+// =====================================================
+let hands = null;
+let stream = null;
+let camStarting = false;
+let camRunning = false;
+let busy = false;
+
+let pinched = false;
+const PINCH_CLOSE = 0.30; // pinch distance / hand size to count as closed
+const PINCH_OPEN  = 0.45; // must open past this to count as open again
+
+function onResults(res) {
+    const lm = res.multiHandLandmarks && res.multiHandLandmarks[0];
+
+    if (!lm) {
+        pinched = false;
+        drawSkeleton(null, false);
+        setStatus('On', 'Show your hand');
+        return;
+    }
+
+    // Measure in aspect-corrected space, relative to hand size,
+    // so it works at any distance from the camera.
+    const aspect = (video.videoWidth / video.videoHeight) || 4 / 3;
+    const d = (a, b) => Math.hypot((a.x - b.x) * aspect, a.y - b.y);
+
+    const handSize = d(lm[0], lm[9]) || 0.001;
+    const ratio = d(lm[4], lm[8]) / handSize;
+
+    const was = pinched;
+    if (!pinched && ratio < PINCH_CLOSE) pinched = true;
+    else if (pinched && ratio > PINCH_OPEN) pinched = false;
+
+    drawSkeleton(lm, pinched);
+    setStatus('On', pinched ? 'Pinched — flap!' : 'Open hand', pinched ? '#5f6' : '#ddd');
+
+    // flap once per pinch, immediately in the same frame
+    if (pinched && !was) press();
+}
 
 async function enableCamera() {
+    if (camRunning || camStarting) return;
+    camStarting = true;
 
     try {
+        setStatus('Requesting permission…', 'Waiting');
 
-        statusEl.innerHTML =
-            'Camera: <strong>Requesting permission…</strong>';
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width:  { ideal: 640 },
+                height: { ideal: 480 },
+                frameRate: { ideal: 60 },
+                facingMode: 'user'
+            },
+            audio: false
+        });
 
-        const hands = new Hands({
+        video.srcObject = stream;
+        await video.play();
 
-            locateFile: f =>
-                `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+        setStatus('Loading hand model…', 'Waiting');
 
+        hands = new Hands({
+            locateFile: f => 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + f
         });
 
         hands.setOptions({
-
             maxNumHands: 1,
-
-            modelComplexity: 1,
-
+            modelComplexity: 0,          // lite model: much faster
             minDetectionConfidence: 0.6,
-
-            minTrackingConfidence: 0.55
-
+            minTrackingConfidence: 0.5
         });
+        hands.onResults(onResults);
 
+        await hands.initialize();        // preload so the first frames aren't slow
 
-        // HAND DETECTION RESULTS
+        camRunning = true;
+        toggleBtn.textContent = 'Camera enabled';
+        setStatus('On', 'Show your hand');
 
-        hands.onResults(res => {
-
-            const lm = res.multiHandLandmarks?.[0];
-
-            drawSkeleton(lm);
-
-            if (!lm) {
-
-                closed = false;
-
-                statusEl.innerHTML =
-                    'Camera: <strong>On</strong><br>' +
-                    'Gesture: <strong>Show your hand</strong>';
-
-                return;
-            }
-
-
-            // THUMB TIP = 4
-            // INDEX TIP = 8
-
-            const dx = lm[4].x - lm[8].x;
-
-            const dy = lm[4].y - lm[8].y;
-
-            const dist = Math.hypot(dx, dy);
-
-
-            // PINCH DETECTION
-
-            closed = dist < 0.055;
-
-
-            statusEl.innerHTML =
-                'Camera: <strong>On</strong><br>' +
-                'Gesture: <strong style="color:' +
-                (closed ? '#5f6' : '#ddd') +
-                '">' +
-                (closed ? 'Pinched — flap!' : 'Open hand') +
-                '</strong>';
-
-
-            // FLAP ONLY ONCE PER PINCH
-
-            if (closed && !wasClosed) {
-
-                if (dead) reset();
-
-                flap();
-            }
-
-            wasClosed = closed;
-
-        });
-
-
-        // CAMERA INITIALIZATION
-
-        cam = new Camera(video, {
-
-            onFrame: async () => {
-
-                await hands.send({
-                    image: video
-                });
-
-            },
-
-            width: 640,
-            height: 480
-
-        });
-
-        await cam.start();
-
-        statusEl.innerHTML =
-            'Camera: <strong>On</strong><br>' +
-            'Gesture: <strong>Show your hand</strong>';
-
-        document.querySelector('#toggle').textContent =
-            'Camera enabled';
+        pump();
 
     } catch (e) {
-
-        statusEl.innerHTML =
-            'Camera: <strong>Could not start</strong><br>' +
-            'Allow camera access and use localhost or HTTPS.';
-
         console.error(e);
-
+        setStatus('Could not start', 'Allow camera access and use localhost or HTTPS.');
+    } finally {
+        camStarting = false;
     }
 }
 
+// Always process the freshest frame; skip frames while the model is busy
+// instead of queueing them (queued frames are what causes lag).
+async function pump() {
+    if (!camRunning) return;
 
-// ===============================
+    if (!busy && video.readyState >= 2) {
+        busy = true;
+        try { await hands.send({ image: video }); } catch (e) { console.error(e); }
+        busy = false;
+    }
+
+    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(pump);
+    else requestAnimationFrame(pump);
+}
+
+// =====================================================
 // BUTTONS
-// ===============================
-
-document.querySelector('#play').onclick = async () => {
-
-    await enableCamera();
-
-    reset();
-
+// =====================================================
+document.querySelector('#play').onclick = () => {
+    reset();            // start the game right away; don't wait for the camera
+    enableCamera();
 };
 
-document.querySelector('#toggle').onclick = enableCamera;
-
-
-// START GAME LOOP
-
-game();
-
+toggleBtn.onclick = enableCamera;
 </script>
 
 </body>
