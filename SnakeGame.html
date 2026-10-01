@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Snake 3D - Bug Hunt</title>
+
+<style>
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #101722;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    display: block;
+}
+
+#ui {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+}
+
+.panel {
+    position: absolute;
+    background: rgba(10, 20, 35, .92);
+    border: 1px solid #287ac0;
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 5px 25px #0008;
+}
+
+#stats { top: calc(18px + env(safe-area-inset-top, 0px)); left: 18px; }
+#stats div { margin: 5px 0; }
+#stats strong { color: #51aaff; }
+#stats .pointsRow strong { color: #ffd54a; }
+#stats .poisonRow strong { color: #c77dff; }
+#stats .jumpRow strong { color: #6ee7a8; }
+
+#timer {
+    top: calc(18px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    border: 2px solid #e84c4c;
+    min-width: 230px;
+}
+
+#timer strong {
+    display: block;
+    color: #ff5353;
+    font-size: 30px;
+    margin-top: 5px;
+}
+
+#aboutButton {
+    position: absolute;
+    top: calc(18px + env(safe-area-inset-top, 0px));
+    right: 18px;
+    pointer-events: auto;
+}
+
+button {
+    background: #087fe5;
+    color: white;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: .15s;
+}
+
+button:hover {
+    background: #249cff;
+    transform: scale(1.04);
+}
+
+button:disabled {
+    background: #35475c;
+    color: #8a97a6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#controls {
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    right: 18px;
+    line-height: 1.8;
+}
+
+#legend {
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    left: 18px;
+    line-height: 1.8;
+}
+
+#modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+#modalBox {
+    width: min(92%, 420px);
+    max-height: 85vh;
+    overflow-y: auto;
+    background: #101d31;
+    border: 2px solid #2689e8;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 10px 50px #000;
+}
+
+#modalBox h2 {
+    margin-top: 0;
+    font-size: 26px;
+}
+
+#modalBox p {
+    color: #d2dce8;
+    line-height: 1.6;
+}
+
+#challengeButton {
+    min-width: 150px;
+    margin-top: 12px;
+}
+
+.modalButtonRow {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+#shopEntryButton {
+    background: #a85ee0;
+}
+
+#shopEntryButton:hover {
+    background: #c178ff;
+}
+
+.hidden { display: none !important; }
+
+#modal.hidden { display: none; }
+
+#shopBalance {
+    background: #182a45;
+    border: 1px solid #ffd54a;
+    border-radius: 10px;
+    padding: 8px 14px;
+    margin-bottom: 16px;
+    font-weight: bold;
+    color: #ffd54a;
+}
+
+#shopList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.shopItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #16243b;
+    border: 1px solid #28456b;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: left;
+}
+
+.shopItemInfo {
+    flex: 1;
+}
+
+.shopItemName {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.shopItemDesc {
+    font-size: 12.5px;
+    color: #a9b8ca;
+    line-height: 1.4;
+}
+
+.shopBuyBtn {
+    min-width: 84px;
+    flex-shrink: 0;
+    background: #2cb866;
+    font-size: 13px;
+    padding: 10px 14px;
+}
+
+.shopBuyBtn:hover:not(:disabled) {
+    background: #38d87c;
+}
+
+.shopBuyBtn.owned {
+    background: #3a4a5e;
+    color: #9fb3c8;
+}
+
+#mobileControls {
+    position: absolute;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    pointer-events: auto;
+    text-align: center;
+}
+
+#mobileControls button {
+    padding: 12px 18px;
+    margin: 3px;
+}
+
+#mobilePowers {
+    position: absolute;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    left: 20px;
+    display: none;
+    pointer-events: auto;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#mobilePowers button {
+    padding: 10px 14px;
+    font-size: 13px;
+}
+
+#mobilePowers .power-poison { background: #9b30ff; }
+#mobilePowers .power-jump { background: #22b36b; }
+
+@media (max-width: 700px) {
+    #legend { display: none; }
+    #controls { bottom: calc(5px + env(safe-area-inset-bottom, 0px)); right: 5px; font-size: 11px; }
+    #stats { top: calc(5px + env(safe-area-inset-top, 0px)); left: 5px; font-size: 12px; padding: 8px; }
+    #timer { top: calc(85px + env(safe-area-inset-top, 0px)); font-size: 12px; }
+    #aboutButton { top: calc(5px + env(safe-area-inset-top, 0px)); right: 5px; padding: 9px; }
+    #mobileControls { display: block; }
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+
+    <div class="panel" id="stats">
+        <div>Score: <strong id="score">0</strong></div>
+        <div>High Score: <strong id="highScore">0</strong></div>
+        <div class="pointsRow">✨ Points: <strong id="points">0</strong></div>
+        <div>🐛 Bugs: <strong id="bugCount">0</strong></div>
+        <div class="poisonRow hidden" id="poisonHud">🧪 Poison: <strong id="poisonCount">0</strong></div>
+        <div class="jumpRow hidden" id="jumpHud">🦘 Jump: <strong id="jumpCount">0</strong></div>
+    </div>
+
+    <div class="panel" id="timer">
+        TIME UNTIL NEXT CHALLENGE
+        <strong id="countdown">3.0</strong>
+    </div>
+
+    <button id="aboutButton" onclick="showAbout()">ⓘ ABOUT</button>
+
+    <div class="panel" id="legend">
+        <b>GAME LEGEND</b><br>
+        🔵 You (Snake)<br>
+        🟢 Food (Grow)<br>
+        🔴 Bugs (Chase You)<br>
+        ⚫ Cylinders (Obstacles)<br>
+        🟣 Poison Trail (Kills Bugs)
+    </div>
+
+    <div class="panel" id="controls">
+        <b>CONTROLS</b><br>
+        W / ↑ Move Up<br>
+        S / ↓ Move Down<br>
+        A / ← Move Left<br>
+        D / → Move Right<br>
+        R Poison Trail<br>
+        SPACE Jump<br>
+        <br>
+        Click every challenge!
+    </div>
+
+    <div id="mobileControls">
+        <button onclick="changeDirection(0,-1)">▲</button><br>
+        <button onclick="changeDirection(-1,0)">◀</button>
+        <button onclick="changeDirection(0,1)">▼</button>
+        <button onclick="changeDirection(1,0)">▶</button>
+    </div>
+
+    <div id="mobilePowers">
+        <button class="power-poison" onclick="activatePoison()">🧪 Poison</button>
+        <button class="power-jump" onclick="doJump()">🦘 Jump</button>
+    </div>
+
+</div>
+
+<div id="modal">
+    <div id="modalBox">
+
+        <div id="defaultView">
+            <h2 id="modalTitle">🐍 BUG HUNT 3D</h2>
+            <p id="modalText">
+                Welcome to Bug Hunt! Eat the green food, avoid the bugs,
+                and click the challenge pop-up every 3 seconds.
+            </p>
+            <div class="modalButtonRow">
+                <button id="challengeButton" onclick="handleModalClick()">START GAME</button>
+                <button id="shopEntryButton" class="hidden" onclick="openShop()">🛒 SHOP</button>
+            </div>
+        </div>
+
+        <div id="shopView" class="hidden">
+            <h2>🛒 SHOP</h2>
+            <div id="shopBalance">Points: 0</div>
+            <div id="shopList"></div>
+            <button onclick="closeShop()">BACK</button>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+
+// =====================================
+// THREE.JS SETUP
+// =====================================
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101722);
+
+const camera = new THREE.PerspectiveCamera(
+    48, window.innerWidth / window.innerHeight, 0.1, 1000
+);
+
+camera.position.set(0, 24, 28);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.appendChild(renderer.domElement);
+
+// =====================================
+// LIGHTING
+// =====================================
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(-10, 25, 12);
+sun.castShadow = true;
+scene.add(sun);
+
+// =====================================
+// GAME SETTINGS
+// =====================================
+
+const SIZE = 20;
+const CELL = 1;
+const HALF = SIZE / 2;
+
+let snake = [];
+let bugs = [];
+let food;
+let obstacles = [];
+
+let direction = {x: 1, z: 0};
+let nextDirection = {x: 1, z: 0};
+
+// =====================================
+// PERSISTENT STORAGE (high score, points, owned power-ups)
+// =====================================
+
+function safeGet(key, fallback) {
+    try {
+        const v = localStorage.getItem(key);
+        return v === null ? fallback : v;
+    } catch (e) {
+        return fallback;
+    }
+}
+
+function safeSet(key, value) {
+    try { localStorage.setItem(key, value); }
+    catch (e) { /* storage unavailable, progress just won't persist */ }
+}
+
+function loadHighScore() { return Number(safeGet("snake3DHigh", 0)); }
+function saveHighScore(value) { safeSet("snake3DHigh", value); }
+
+function loadPoints() { return Number(safeGet("snake3DPoints", 0)); }
+function savePoints(value) { safeSet("snake3DPoints", value); }
+
+function loadOwned() {
+    try { return JSON.parse(safeGet("snake3DOwned", "{}")); }
+    catch (e) { return {}; }
+}
+function saveOwned(value) { safeSet("snake3DOwned", JSON.stringify(value)); }
+
+let score = 0;
+let highScore = loadHighScore();
+let points = loadPoints();
+let owned = loadOwned();
+
+document.getElementById("highScore").textContent = highScore;
+
+// =====================================
+// SHOP
+// =====================================
+
+const SHOP_ITEMS = [
+    {
+        id: "poison",
+        name: "🧪 Poison Trail",
+        desc: "Press R to leave a poisonous trail behind your tail for 5 seconds. Any bug that steps in it dies instantly. 3 uses per game.",
+        cost: 150
+    },
+    {
+        id: "jump",
+        name: "🦘 Jump Boots",
+        desc: "Press SPACE to leap two tiles forward, clearing obstacles and squashing any bug you jump over or land on. 3 uses per game.",
+        cost: 250
+    }
+];
+
+const POISON_MAX_CHARGES = 3;
+const JUMP_MAX_CHARGES = 3;
+
+function updateHud() {
+
+    document.getElementById("points").textContent = points;
+
+    const poisonHud = document.getElementById("poisonHud");
+    const jumpHud = document.getElementById("jumpHud");
+
+    if (owned.poison) {
+        poisonHud.classList.remove("hidden");
+        document.getElementById("poisonCount").textContent = poisonCharges;
+    } else {
+        poisonHud.classList.add("hidden");
+    }
+
+    if (owned.jump) {
+        jumpHud.classList.remove("hidden");
+        document.getElementById("jumpCount").textContent = jumpCharges;
+    } else {
+        jumpHud.classList.add("hidden");
+    }
+
+    document.getElementById("mobilePowers").style.display =
+        (owned.poison || owned.jump) ? "flex" : "none";
+}
+
+function renderShopList() {
+
+    const list = document.getElementById("shopList");
+    list.innerHTML = "";
+
+    SHOP_ITEMS.forEach(item => {
+
+        const isOwned = !!owned[item.id];
+        const canAfford = points >= item.cost;
+
+        const row = document.createElement("div");
+        row.className = "shopItem";
+
+        row.innerHTML =
+            '<div class="shopItemInfo">' +
+                '<div class="shopItemName">' + item.name + '</div>' +
+                '<div class="shopItemDesc">' + item.desc + '</div>' +
+            '</div>' +
+            '<button class="shopBuyBtn' + (isOwned ? ' owned' : '') + '" ' +
+                (isOwned || !canAfford ? 'disabled' : '') +
+                ' onclick="buyItem(\'' + item.id + '\')">' +
+                (isOwned ? 'OWNED' : item.cost + ' pts') +
+            '</button>';
+
+        list.appendChild(row);
+    });
+}
+
+function openShop() {
+
+    document.getElementById("shopBalance").textContent = "Points: " + points;
+    renderShopList();
+
+    document.getElementById("defaultView").classList.add("hidden");
+    document.getElementById("shopView").classList.remove("hidden");
+}
+
+function closeShop() {
+
+    document.getElementById("shopView").classList.add("hidden");
+    document.getElementById("defaultView").classList.remove("hidden");
+}
+
+function buyItem(id) {
+
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if (!item || owned[id] || points < item.cost) return;
+
+    points -= item.cost;
+    owned[id] = true;
+
+    savePoints(points);
+    saveOwned(owned);
+
+    updateHud();
+    openShop();
+}
+
+let playing = false;
+let gameEnded = false;
+let challengeOpen = false;
+let aboutOpen = false;
+
+let moveTimer = 0;
+let challengeTimer = 3;
+let lastTime = 0;
+let bugSpawnTimer = 0;
+
+// Power-up state
+let poisonCharges = 0;
+let jumpCharges = 0;
+let poisonActive = false;
+let poisonTimer = 0;
+let poisonTiles = [];
+let jumping = false;
+let jumpTimer = 0;
+const JUMP_ANIM_TIME = 0.3;
+const POISON_DURATION = 5;
+const POISON_TILE_LIFETIME = 8;
+
+const bugMeshes = [];
+const obstacleMeshes = [];
+
+const scoreElement = document.getElementById("score");
+const countdownElement = document.getElementById("countdown");
+
+// =====================================
+// MATERIALS
+// =====================================
+
+function material(color, emissive = 0x000000) {
+    return new THREE.MeshStandardMaterial({
+        color,
+        emissive,
+        roughness: 0.45,
+        metalness: 0.15
+    });
+}
+
+// Snake
+const snakeMatA = material(0x1e90ff);
+const snakeMatB = material(0x1470c8);
+const headMaterial = material(0x47b2ff);
+const spotMaterial = material(0xa8e6ff, 0x1a4a60);
+const eyeWhite = material(0xffffff, 0x333333);
+const pupilMat = material(0x05080d);
+const tongueMat = material(0xff2f5a, 0x66001a);
+
+// Bug
+const bugMaterial = material(0xef3434, 0x440000);
+const bugDark = material(0x3a0c0c);
+const bugBlack = material(0x0a0505);
+const bugEyeMat = material(0xffe14d, 0x9a7400);
+
+// Misc
+const foodMaterial = material(0x38f052, 0x087b12);
+const obstacleMaterial = material(0x566176);
+
+// =====================================
+// CYLINDER HELPERS
+// Everything in the game is made of cylinders.
+// A shared unit cylinder is scaled into each shape:
+// scale = (radiusX, height, radiusZ)
+// =====================================
+
+const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 20);
+
+function cyl(parent, rx, h, rz, mat, x = 0, y = 0, z = 0) {
+
+    const mesh = new THREE.Mesh(unitCylinder, mat);
+
+    mesh.scale.set(rx, h, rz);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    parent.add(mesh);
+    return mesh;
+}
+
+function makeCylinder(x, z, radius, height, mat, segments = 16) {
+
+    const geometry = new THREE.CylinderGeometry(
+        radius, radius, height, segments
+    );
+
+    const mesh = new THREE.Mesh(geometry, mat);
+
+    mesh.position.set(x, height / 2, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    scene.add(mesh);
+    return mesh;
+}
+
+function positionMesh(mesh, x, z) {
+    mesh.position.x = x;
+    mesh.position.z = z;
+}
+
+function lerpAngle(current, target, t) {
+    let d = target - current;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return current + d * t;
+}
+
+// =====================================
+// FLOOR
+// =====================================
+
+const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(SIZE, SIZE),
+    material(0x202c3b)
+);
+
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.05;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Grid lines
+const grid = new THREE.GridHelper(SIZE, SIZE, 0x53677b, 0x344456);
+grid.position.y = 0.01;
+scene.add(grid);
+
+// Arena boundary cylinders
+for (let i = 0; i < SIZE; i++) {
+    makeCylinder(-HALF + i + 0.5, -HALF, 0.5, 0.5, obstacleMaterial);
+    makeCylinder(-HALF + i + 0.5, HALF, 0.5, 0.5, obstacleMaterial);
+    makeCylinder(-HALF, -HALF + i + 0.5, 0.5, 0.5, obstacleMaterial);
+    makeCylinder(HALF, -HALF + i + 0.5, 0.5, 0.5, obstacleMaterial);
+}
+
+// =====================================
+// OBSTACLES
+// =====================================
+
+const obstaclePositions = [
+    [-5,-4], [4,-5], [6,3], [-6,5],
+    [0,-7], [-2,6], [7,-1], [-7,-1]
+];
+
+obstaclePositions.forEach(pos => {
+
+    const mesh = makeCylinder(
+        pos[0], pos[1], 0.55, 1.8, obstacleMaterial, 20
+    );
+
+    obstacles.push({x:pos[0], z:pos[1]});
+    obstacleMeshes.push(mesh);
+});
+
+// =====================================
+// SNAKE MODEL
+// Head: oval skull + snout + bulging eyes + flicking forked tongue.
+// Body: round segments joined by horizontal cylinders into a smooth
+// tube, with a pattern of light scales and a tapering tail.
+// =====================================
+
+const snakeGroup = new THREE.Group();
+scene.add(snakeGroup);
+
+const HEAD_RADIUS = 0.4;
+
+const headGroup = new THREE.Group();
+snakeGroup.add(headGroup);
+
+// Skull and snout (local +Z is "forward")
+cyl(headGroup, 0.44, 0.84, 0.52, headMaterial, 0, 0.42, 0.05);
+cyl(headGroup, 0.30, 0.62, 0.30, headMaterial, 0, 0.31, 0.45);
+
+// Light crest between the eyes
+cyl(headGroup, 0.2, 0.03, 0.2, spotMaterial, 0, 0.855, -0.12);
+
+// Nostrils
+[-1, 1].forEach(s => {
+    cyl(headGroup, 0.035, 0.02, 0.035, pupilMat, s * 0.09, 0.63, 0.56);
+});
+
+// Eyes
+[-1, 1].forEach(s => {
+    cyl(headGroup, 0.15, 0.12, 0.15, eyeWhite, s * 0.28, 0.86, 0.18);
+    cyl(headGroup, 0.075, 0.05, 0.095, pupilMat, s * 0.28, 0.915, 0.21);
+});
+
+// Forked tongue
+const tongueGroup = new THREE.Group();
+tongueGroup.position.set(0, 0.2, 0.72);
+headGroup.add(tongueGroup);
+
+const TONGUE_STEM = 0.28;
+const stem = cyl(tongueGroup, 0.035, TONGUE_STEM, 0.035, tongueMat, 0, 0, TONGUE_STEM / 2);
+stem.rotation.x = Math.PI / 2;
+
+[-1, 1].forEach(s => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0, 0, TONGUE_STEM);
+    pivot.rotation.y = s * 0.45;
+    tongueGroup.add(pivot);
+
+    const prong = cyl(pivot, 0.025, 0.16, 0.025, tongueMat, 0, 0, 0.08);
+    prong.rotation.x = Math.PI / 2;
+});
+
+let headAngle = Math.PI / 2;
+let headTarget = Math.PI / 2;
+
+const bodyPool = [];
+const spotPool = [];
+const linkPool = [];
+
+function segRadius(i, n) {
+    // Tail tapers over the last few segments
+    const fromTail = n - 1 - i;
+    return 0.2 + Math.min(fromTail, 4) / 4 * 0.2;
+}
+
+function createSnake() {
+
+    snake = [
+        {x:0,z:0},
+        {x:-1,z:0},
+        {x:-2,z:0}
+    ];
+
+    headAngle = headTarget = Math.atan2(direction.x, direction.z);
+    headGroup.rotation.y = headAngle;
+
+    updateSnake();
+}
+
+function updateSnake() {
+
+    const n = snake.length;
+
+    headGroup.position.set(snake[0].x, 0, snake[0].z);
+    headTarget = Math.atan2(direction.x, direction.z);
+
+    while (bodyPool.length < n - 1) {
+        bodyPool.push(cyl(snakeGroup, 1, 1, 1, snakeMatA));
+        spotPool.push(cyl(snakeGroup, 1, 1, 1, spotMaterial));
+    }
+
+    while (linkPool.length < n - 1) {
+        linkPool.push(cyl(snakeGroup, 1, 1, 1, snakeMatA));
+    }
+
+    // Body segments + back scales
+    for (let i = 1; i < n; i++) {
+
+        const r = segRadius(i, n);
+        const seg = bodyPool[i - 1];
+        const spot = spotPool[i - 1];
+
+        seg.visible = true;
+        seg.scale.set(r, r * 2, r);
+        seg.position.set(snake[i].x, r, snake[i].z);
+        seg.material = i % 2 ? snakeMatA : snakeMatB;
+
+        spot.visible = (i % 2 === 1) && r > 0.25;
+        spot.scale.set(r * 0.55, 0.03, r * 0.55);
+        spot.position.set(snake[i].x, r * 2 + 0.012, snake[i].z);
+    }
+
+    // Links between neighbouring segments (stretched to match actual
+    // distance so a jump gap shows as a smooth stretch, not a tear)
+    for (let i = 0; i < n - 1; i++) {
+
+        const ra = i === 0 ? HEAD_RADIUS : segRadius(i, n);
+        const rb = segRadius(i + 1, n);
+        const r = (ra + rb) / 2;
+
+        const a = snake[i];
+        const b = snake[i + 1];
+        const link = linkPool[i];
+
+        const dist = Math.max(0.001, Math.hypot(b.x - a.x, b.z - a.z));
+
+        link.visible = true;
+        link.scale.set(r, dist, r);
+        link.position.set((a.x + b.x) / 2, r, (a.z + b.z) / 2);
+        link.rotation.set(0, 0, 0);
+
+        if (a.x !== b.x) link.rotation.z = Math.PI / 2;
+        else link.rotation.x = Math.PI / 2;
+
+        link.material = i % 2 ? snakeMatB : snakeMatA;
+    }
+
+    // Hide unused pooled pieces
+    for (let i = n - 1; i < bodyPool.length; i++) {
+        bodyPool[i].visible = false;
+        spotPool[i].visible = false;
+    }
+
+    for (let i = n - 1; i < linkPool.length; i++) {
+        linkPool[i].visible = false;
+    }
+}
+
+// =====================================
+// FOOD
+// =====================================
+
+function spawnFood() {
+
+    let x,z;
+    let valid = false;
+
+    while (!valid) {
+
+        x = Math.floor(Math.random() * (SIZE-2)) - HALF + 1;
+        z = Math.floor(Math.random() * (SIZE-2)) - HALF + 1;
+
+        valid =
+            !snake.some(s => s.x === x && s.z === z) &&
+            !bugs.some(b => b.x === x && b.z === z) &&
+            !obstacles.some(o => o.x === x && o.z === z);
+    }
+
+    if (food) scene.remove(food);
+
+    food = makeCylinder(x,z,0.3,0.65,foodMaterial,12);
+}
+
+// =====================================
+// POISON TRAIL
+// =====================================
+
+function activatePoison() {
+
+    if (!playing || challengeOpen || gameEnded) return;
+    if (!owned.poison || poisonCharges <= 0 || poisonActive) return;
+
+    poisonActive = true;
+    poisonTimer = POISON_DURATION;
+    poisonCharges--;
+
+    updateHud();
+}
+
+function spawnPoisonTile(x, z) {
+
+    // Refresh an existing tile at this cell instead of stacking a new one
+    const existing = poisonTiles.find(t => t.x === x && t.z === z);
+
+    if (existing) {
+        existing.life = POISON_TILE_LIFETIME;
+        return;
+    }
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x9b30ff,
+        emissive: 0x4b0082,
+        transparent: true,
+        opacity: 0.8,
+        roughness: 0.3
+    });
+
+    const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.46, 0.46, 0.06, 16),
+        mat
+    );
+
+    mesh.position.set(x, 0.04, z);
+    scene.add(mesh);
+
+    poisonTiles.push({x, z, mesh, life: POISON_TILE_LIFETIME});
+}
+
+function checkPoisonKills() {
+
+    let killed = false;
+
+    for (let i = bugs.length - 1; i >= 0; i--) {
+
+        const b = bugs[i];
+
+        if (poisonTiles.some(t => t.life > 0 && t.x === b.x && t.z === b.z)) {
+            scene.remove(b.mesh);
+            bugMeshes.splice(bugMeshes.indexOf(b.mesh), 1);
+            bugs.splice(i, 1);
+            score += 5;
+            killed = true;
+        }
+    }
+
+    if (killed) {
+        scoreElement.textContent = score;
+        document.getElementById("bugCount").textContent = bugs.length;
+    }
+}
+
+// =====================================
+// JUMP
+// =====================================
+
+function doJump() {
+
+    if (!playing || challengeOpen || gameEnded) return;
+    if (!owned.jump || jumpCharges <= 0 || jumping) return;
+
+    const dir = {...nextDirection};
+    direction = dir;
+
+    const mid = {x: snake[0].x + dir.x, z: snake[0].z + dir.z};
+    const land = {x: snake[0].x + dir.x * 2, z: snake[0].z + dir.z * 2};
+
+    // Can't jump out of the arena
+    if (Math.abs(land.x) >= HALF || Math.abs(land.z) >= HALF) return;
+
+    // Can't land inside an obstacle
+    if (obstacles.some(o => o.x === land.x && o.z === land.z)) return;
+
+    jumpCharges--;
+    updateHud();
+
+    // Squash any bug jumped over or landed on, Goomba-style
+    [mid, land].forEach(cell => {
+
+        const idx = bugs.findIndex(b => b.x === cell.x && b.z === cell.z);
+
+        if (idx !== -1) {
+            const b = bugs.splice(idx, 1)[0];
+            scene.remove(b.mesh);
+            bugMeshes.splice(bugMeshes.indexOf(b.mesh), 1);
+            score += 20;
+        }
+    });
+
+    scoreElement.textContent = score;
+    document.getElementById("bugCount").textContent = bugs.length;
+
+    const eating = food && food.position.x === land.x && food.position.z === land.z;
+    const bodyCheck = eating ? snake : snake.slice(0, -1);
+
+    if (bodyCheck.some(s => s.x === land.x && s.z === land.z)) {
+        endGame("You landed on yourself!");
+        return;
+    }
+
+    snake.unshift(land);
+
+    if (eating) {
+        score += 10;
+        scoreElement.textContent = score;
+        spawnFood();
+        if (score % 30 === 0) spawnBug();
+    } else {
+        snake.pop();
+    }
+
+    updateSnake();
+
+    jumping = true;
+    jumpTimer = JUMP_ANIM_TIME;
+}
+
+// =====================================
+// BUG MODEL
+// Red shell with a centre seam and spots, dark thorax and head,
+// glowing eyes, mandibles, antennae and six walking legs.
+// =====================================
+
+function buildBug() {
+
+    const g = new THREE.Group();
+
+    // Shell (abdomen)
+    cyl(g, 0.34, 0.28, 0.44, bugMaterial, 0, 0.37, -0.12);
+
+    // Shell seam and spots
+    cyl(g, 0.025, 0.02, 0.44, bugBlack, 0, 0.515, -0.12);
+
+    [[-1, -0.35], [1, -0.35], [-1, -0.1], [1, -0.1]].forEach(p => {
+        cyl(g, 0.07, 0.02, 0.07, bugBlack, p[0] * 0.14, 0.515, p[1]);
+    });
+
+    // Thorax and head
+    cyl(g, 0.25, 0.24, 0.2, bugDark, 0, 0.36, 0.3);
+    cyl(g, 0.2, 0.22, 0.17, bugDark, 0, 0.34, 0.5);
+
+    // Eyes
+    [-1, 1].forEach(s => {
+        cyl(g, 0.07, 0.07, 0.07, bugEyeMat, s * 0.12, 0.47, 0.56);
+        cyl(g, 0.035, 0.03, 0.035, bugBlack, s * 0.12, 0.505, 0.58);
+    });
+
+    // Mandibles
+    [-1, 1].forEach(s => {
+        const m = cyl(g, 0.03, 0.16, 0.03, bugBlack, s * 0.07, 0.28, 0.7);
+        m.rotation.x = Math.PI / 2;
+    });
+
+    // Antennae
+    [-1, 1].forEach(s => {
+        const p = new THREE.Group();
+        p.position.set(s * 0.08, 0.45, 0.55);
+        p.rotation.order = "YXZ";
+        p.rotation.set(1.05, s * 0.45, 0);
+        g.add(p);
+
+        cyl(p, 0.02, 0.42, 0.02, bugBlack, 0, 0.21, 0);
+        cyl(p, 0.05, 0.05, 0.05, bugEyeMat, 0, 0.43, 0);
+    });
+
+    // Legs (3 per side)
+    const legs = [];
+    const legZ = [0.25, 0.05, -0.2];
+
+    [-1, 1].forEach(s => {
+        legZ.forEach((lz, k) => {
+
+            const pivot = new THREE.Group();
+            pivot.position.set(s * 0.2, 0.3, lz);
+            g.add(pivot);
+
+            const upper = cyl(pivot, 0.025, 0.26, 0.025, bugBlack, s * 0.13, 0, 0);
+            upper.rotation.z = Math.PI / 2;
+
+            cyl(pivot, 0.025, 0.3, 0.025, bugBlack, s * 0.26, -0.15, 0);
+
+            pivot.userData.base = (k - 1) * 0.3 * s;
+            pivot.userData.phase = ((k + (s > 0 ? 1 : 0)) % 2) * Math.PI;
+
+            legs.push(pivot);
+        });
+    });
+
+    g.userData.legs = legs;
+
+    scene.add(g);
+    return g;
+}
+
+// =====================================
+// BUGS
+// =====================================
+
+function spawnBug() {
+
+    if (bugs.length >= 8) return;
+
+    let x,z;
+    let valid = false;
+
+    for (let attempt = 0; attempt < 100; attempt++) {
+
+        x = Math.floor(Math.random() * (SIZE-2)) - HALF + 1;
+        z = Math.floor(Math.random() * (SIZE-2)) - HALF + 1;
+
+        if (
+            !snake.some(s => s.x === x && s.z === z) &&
+            !obstacles.some(o => o.x === x && o.z === z) &&
+            !(food && food.position.x === x && food.position.z === z) &&
+            Math.abs(x - snake[0].x) + Math.abs(z - snake[0].z) > 5
+        ) {
+            valid = true;
+            break;
+        }
+    }
+
+    if (!valid) return;
+
+    const mesh = buildBug();
+    mesh.position.set(x, 0, z);
+    mesh.scale.setScalar(0.01);
+
+    const angle = Math.atan2(snake[0].x - x, snake[0].z - z);
+    mesh.rotation.y = angle;
+
+    bugs.push({x, z, mesh, moveCounter: 0, angle, target: angle});
+    bugMeshes.push(mesh);
+
+    document.getElementById("bugCount").textContent = bugs.length;
+}
+
+function moveBugs() {
+
+    bugs.forEach(bug => {
+
+        const moves = [
+            {x:1,z:0}, {x:-1,z:0},
+            {x:0,z:1}, {x:0,z:-1}
+        ];
+
+        moves.sort(() => Math.random() - 0.5);
+
+        let best = null;
+        let bestDistance = Infinity;
+
+        for (const m of moves) {
+
+            const nx = bug.x + m.x;
+            const nz = bug.z + m.z;
+
+            if (
+                Math.abs(nx) >= HALF ||
+                Math.abs(nz) >= HALF
+            ) continue;
+
+            if (obstacles.some(o => o.x === nx && o.z === nz)) continue;
+
+            if (bugs.some(b => b !== bug && b.x === nx && b.z === nz)) continue;
+
+            const dist =
+                Math.abs(nx - snake[0].x) +
+                Math.abs(nz - snake[0].z);
+
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                best = {x:nx,z:nz,dx:m.x,dz:m.z};
+            }
+        }
+
+        if (best) {
+            bug.x = best.x;
+            bug.z = best.z;
+            bug.target = Math.atan2(best.dx, best.dz);
+        }
+    });
+}
+
+// =====================================
+// GAME MOVEMENT
+// =====================================
+
+function changeDirection(x,z) {
+
+    if (x === -direction.x && z === -direction.z) return;
+
+    nextDirection = {x,z};
+}
+
+function moveSnake() {
+
+    if (!playing || challengeOpen) return;
+
+    direction = {...nextDirection};
+
+    const head = {
+        x: snake[0].x + direction.x,
+        z: snake[0].z + direction.z
+    };
+
+    // Wall collision
+    if (
+        Math.abs(head.x) >= HALF ||
+        Math.abs(head.z) >= HALF
+    ) {
+        endGame("You hit the wall!");
+        return;
+    }
+
+    // Obstacle collision
+    if (obstacles.some(o => o.x === head.x && o.z === head.z)) {
+        endGame("You hit an obstacle!");
+        return;
+    }
+
+    const eating =
+        food.position.x === head.x &&
+        food.position.z === head.z;
+
+    const body = eating ? snake : snake.slice(0,-1);
+
+    if (body.some(s => s.x === head.x && s.z === head.z)) {
+        endGame("You hit yourself!");
+        return;
+    }
+
+    if (bugs.some(b => b.x === head.x && b.z === head.z)) {
+        endGame("A bug caught you!");
+        return;
+    }
+
+    // Drop a poison tile where the tail is about to leave from
+    if (poisonActive && !eating && snake.length > 0) {
+        const tail = snake[snake.length - 1];
+        spawnPoisonTile(tail.x, tail.z);
+    }
+
+    snake.unshift(head);
+
+    if (eating) {
+        score += 10;
+        scoreElement.textContent = score;
+        spawnFood();
+
+        if (score % 30 === 0) spawnBug();
+
+    } else {
+        snake.pop();
+    }
+
+    updateSnake();
+
+    moveBugs();
+    checkPoisonKills();
+
+    if (bugs.some(b =>
+        snake.some(s => s.x === b.x && s.z === b.z)
+    )) {
+        endGame("The bugs caught you!");
+    }
+}
+
+// =====================================
+// RANDOM CHALLENGES
+// =====================================
+
+const challenges = [
+
+    {
+        title: "⚡ QUICK CHECK!",
+        text: "The bugs are closing in! Click the button to survive.",
+        button: "SAVE ME!"
+    },
+    {
+        title: "🪲 BUG ALERT!",
+        text: "A bug spotted you! React quickly!",
+        button: "SQUASH!"
+    },
+    {
+        title: "🚨 EMERGENCY!",
+        text: "Emergency survival check. Click before time runs out!",
+        button: "I'M ALIVE!"
+    },
+    {
+        title: "🍎 FOOD BREAK!",
+        text: "The snake needs your attention. Confirm to continue.",
+        button: "KEEP GOING"
+    },
+    {
+        title: "👀 ARE YOU THERE?",
+        text: "The game needs your attention. Click to stay alive!",
+        button: "YES!"
+    },
+    {
+        title: "💥 INCOMING!",
+        text: "Something is coming! React now!",
+        button: "DODGE!"
+    },
+    {
+        title: "🐍 SNAKE CHECK!",
+        text: "Don't let the bugs distract you. Click to continue.",
+        button: "CONTINUE"
+    },
+    {
+        title: "⏰ TIME'S TICKING!",
+        text: "Quick! Complete this survival check.",
+        button: "GOT IT!"
+    },
+    {
+        title: "🧪 EXPERIMENT!",
+        text: "You have been selected for a random survival test.",
+        button: "ACCEPT"
+    },
+    {
+        title: "🎯 TARGET LOCKED!",
+        text: "Click the button to escape the bug's attention!",
+        button: "ESCAPE!"
+    },
+    {
+        title: "🌟 BONUS ROUND!",
+        text: "Stay alert! Confirm your survival.",
+        button: "LET'S GO!"
+    },
+    {
+        title: "🔔 NOTIFICATION!",
+        text: "One click separates you from survival.",
+        button: "DISMISS"
+    }
+];
+
+function showChallenge() {
+
+    if (!playing || gameEnded || aboutOpen) return;
+
+    challengeOpen = true;
+
+    const challenge = challenges[
+        Math.floor(Math.random() * challenges.length)
+    ];
+
+    document.getElementById("shopEntryButton").classList.add("hidden");
+    document.getElementById("modalTitle").textContent = challenge.title;
+    document.getElementById("modalText").textContent = challenge.text;
+    document.getElementById("challengeButton").textContent = challenge.button;
+
+    document.getElementById("modal").classList.remove("hidden");
+
+    challengeTimer = 3;
+}
+
+function handleModalClick() {
+
+    if (gameEnded) {
+        startGame();
+        return;
+    }
+
+    if (aboutOpen) {
+        aboutOpen = false;
+        document.getElementById("modal").classList.add("hidden");
+        return;
+    }
+
+    if (!playing) {
+        startGame();
+        return;
+    }
+
+    challengeOpen = false;
+    challengeTimer = 3;
+
+    document.getElementById("modal").classList.add("hidden");
+}
+
+function showAbout() {
+
+    if (challengeOpen || gameEnded) return;
+
+    aboutOpen = true;
+    challengeOpen = true;
+
+    document.getElementById("shopEntryButton").classList.add("hidden");
+    document.getElementById("modalTitle").textContent = "ⓘ ABOUT BUG HUNT 3D";
+
+    document.getElementById("modalText").textContent =
+        "A 3D Snake game made with Three.js. Every asset is built using cylinders. Eat green food to grow, avoid the red bugs that chase you, and survive the random timed pop-ups. Earn points from your score and spend them in the shop on power-ups like a poison trail and a Goomba-style jump.";
+
+    document.getElementById("challengeButton").textContent = "GOT IT!";
+
+    document.getElementById("modal").classList.remove("hidden");
+}
+
+// =====================================
+// GAME OVER
+// =====================================
+
+function endGame(reason) {
+
+    if (gameEnded) return;
+
+    gameEnded = true;
+    playing = false;
+    challengeOpen = true;
+
+    if (score > highScore) {
+        highScore = score;
+        saveHighScore(highScore);
+        document.getElementById("highScore").textContent = highScore;
+    }
+
+    points += score;
+    savePoints(points);
+    updateHud();
+
+    document.getElementById("modalTitle").textContent = "💀 GAME OVER";
+
+    document.getElementById("modalText").textContent =
+        reason + " Final score: " + score + ". +" + score + " points earned (total: " + points + ").";
+
+    document.getElementById("challengeButton").textContent = "PLAY AGAIN";
+    document.getElementById("shopEntryButton").classList.remove("hidden");
+
+    document.getElementById("modal").classList.remove("hidden");
+}
+
+// =====================================
+// START / RESET
+// =====================================
+
+function startGame() {
+
+    closeShop();
+
+    bugMeshes.forEach(m => scene.remove(m));
+    poisonTiles.forEach(t => scene.remove(t.mesh));
+
+    bugMeshes.length = 0;
+    bugs.length = 0;
+    poisonTiles.length = 0;
+
+    score = 0;
+    moveTimer = 0;
+    challengeTimer = 3;
+    bugSpawnTimer = 0;
+
+    poisonActive = false;
+    poisonTimer = 0;
+    jumping = false;
+    jumpTimer = 0;
+    poisonCharges = owned.poison ? POISON_MAX_CHARGES : 0;
+    jumpCharges = owned.jump ? JUMP_MAX_CHARGES : 0;
+
+    scoreElement.textContent = 0;
+    document.getElementById("bugCount").textContent = 0;
+    document.getElementById("shopEntryButton").classList.add("hidden");
+
+    direction = {x:1,z:0};
+    nextDirection = {x:1,z:0};
+
+    gameEnded = false;
+    challengeOpen = false;
+    aboutOpen = false;
+    playing = true;
+
+    createSnake();
+    spawnFood();
+    spawnBug();
+    updateHud();
+
+    document.getElementById("modal").classList.add("hidden");
+}
+
+// =====================================
+// KEYBOARD
+// =====================================
+
+document.addEventListener("keydown", e => {
+
+    const key = e.key.toLowerCase();
+
+    if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(key)) {
+        e.preventDefault();
+    }
+
+    if (key === "arrowup" || key === "w") changeDirection(0,-1);
+    if (key === "arrowdown" || key === "s") changeDirection(0,1);
+    if (key === "arrowleft" || key === "a") changeDirection(-1,0);
+    if (key === "arrowright" || key === "d") changeDirection(1,0);
+    if (key === "r") activatePoison();
+    if (key === " ") doJump();
+});
+
+// =====================================
+// ANIMATION LOOP
+// =====================================
+
+function animate(time) {
+
+    requestAnimationFrame(animate);
+
+    const delta = Math.min((time - lastTime) / 1000, 0.05);
+    lastTime = time;
+
+    if (playing) {
+
+        // Snake movement
+        moveTimer += delta;
+
+        const speed = Math.max(0.09, 0.16 - score * 0.0005);
+
+        if (moveTimer >= speed && !challengeOpen) {
+            moveTimer = 0;
+            moveSnake();
+        }
+
+        // Bug spawning
+        bugSpawnTimer += delta;
+
+        if (bugSpawnTimer >= 9) {
+            bugSpawnTimer = 0;
+            spawnBug();
+        }
+
+        // Poison trail countdown
+        if (poisonActive) {
+            poisonTimer -= delta;
+            if (poisonTimer <= 0) poisonActive = false;
+        }
+
+        // Challenge countdown
+        if (!aboutOpen && challengeOpen) {
+
+            challengeTimer -= delta;
+
+            countdownElement.textContent =
+                Math.max(0, challengeTimer).toFixed(1);
+
+            if (challengeTimer <= 0) {
+                endGame("You missed the challenge!");
+            }
+
+        } else if (!aboutOpen && !challengeOpen) {
+
+            challengeTimer -= delta;
+
+            countdownElement.textContent =
+                Math.max(0, challengeTimer).toFixed(1);
+
+            if (challengeTimer <= 0) {
+                showChallenge();
+            }
+        }
+
+        // Animate food
+        if (food) {
+            food.position.y = 0.55 + Math.sin(time * 0.003) * 0.12;
+            food.rotation.y += delta;
+        }
+    }
+
+    // Fade and expire poison tiles, and keep checking for bugs that
+    // wander into one between snake moves
+    if (poisonTiles.length) {
+
+        for (let i = poisonTiles.length - 1; i >= 0; i--) {
+
+            const t = poisonTiles[i];
+            t.life -= delta;
+
+            if (t.life <= 0) {
+                scene.remove(t.mesh);
+                poisonTiles.splice(i, 1);
+                continue;
+            }
+
+            t.mesh.material.opacity = Math.max(0, t.life / POISON_TILE_LIFETIME) * 0.8;
+            t.mesh.rotation.y += delta * 0.6;
+        }
+
+        if (playing) checkPoisonKills();
+    }
+
+    // Jump arc: head lifts up and comes back down over the landing
+    if (jumping) {
+
+        jumpTimer -= delta;
+        const progress = 1 - Math.max(0, jumpTimer) / JUMP_ANIM_TIME;
+        headGroup.position.y = Math.sin(Math.min(1, progress) * Math.PI) * 1.3;
+
+        if (jumpTimer <= 0) {
+            jumping = false;
+            headGroup.position.y = 0;
+        }
+    }
+
+    // Snake head turns smoothly and the tongue flicks
+    headAngle = lerpAngle(headAngle, headTarget, Math.min(1, delta * 18));
+    headGroup.rotation.y = headAngle;
+
+    const flick = Math.pow(Math.max(0, Math.sin(time * 0.007)), 3);
+    tongueGroup.scale.z = 0.12 + 0.88 * flick;
+
+    // Bugs glide between cells, turn to face their heading and scuttle
+    bugs.forEach(b => {
+
+        const m = b.mesh;
+        const k = Math.min(1, delta * 16);
+
+        m.position.x += (b.x - m.position.x) * k;
+        m.position.z += (b.z - m.position.z) * k;
+
+        b.angle = lerpAngle(b.angle, b.target, Math.min(1, delta * 12));
+        m.rotation.y = b.angle;
+
+        const s = m.scale.x;
+        m.scale.setScalar(s + (1.1 - s) * Math.min(1, delta * 8));
+
+        if (playing) {
+            m.position.y = Math.abs(Math.sin(time * 0.012 + b.x)) * 0.05;
+
+            m.userData.legs.forEach(leg => {
+                leg.rotation.y =
+                    leg.userData.base +
+                    Math.sin(time * 0.02 + leg.userData.phase) * 0.3;
+            });
+        }
+    });
+
+    renderer.render(scene, camera);
+}
+
+// Show the snake and a piece of food behind the start screen
+createSnake();
+spawnFood();
+updateHud();
+
+requestAnimationFrame(animate);
+
+// =====================================
+// RESIZE
+// =====================================
+
+window.addEventListener("resize", () => {
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
+</body>
+</html>
